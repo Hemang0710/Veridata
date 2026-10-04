@@ -4,6 +4,7 @@ Exports traces to Langfuse over OTLP/HTTP with Basic auth. Reads config from the
 environment (loaded from .env by main). If Langfuse keys are missing the app
 still boots; it just doesn't export.
 """
+
 from __future__ import annotations
 
 import base64
@@ -24,6 +25,7 @@ SERVICE_NAME = "veridata-backend"
 
 
 def _langfuse_endpoint() -> str | None:
+    """Full OTLP traces URL, from LANGFUSE_OTEL_ENDPOINT or derived from base URL."""
     explicit = os.getenv("LANGFUSE_OTEL_ENDPOINT")
     if explicit:
         return explicit
@@ -35,6 +37,7 @@ def _langfuse_endpoint() -> str | None:
 
 def init_telemetry(app) -> None:
     provider = TracerProvider(resource=Resource.create({"service.name": SERVICE_NAME}))
+
     endpoint = _langfuse_endpoint()
     public, secret = os.getenv("LANGFUSE_PUBLIC_KEY"), os.getenv("LANGFUSE_SECRET_KEY")
     if endpoint and public and secret:
@@ -44,6 +47,7 @@ def init_telemetry(app) -> None:
         log.info("OTLP trace export enabled -> %s", endpoint)
     else:
         log.warning("Langfuse config incomplete; traces will not be exported.")
+
     trace.set_tracer_provider(provider)
 
     dsn = os.getenv("SENTRY_DSN")

@@ -16,7 +16,7 @@ import pytest
 from dotenv import load_dotenv
 
 from app.ingest import ingest_csv
-from app.llm import AnthropicLLM
+from app.llm import DEFAULT_VERIFY_MODEL, AnthropicLLM
 from app.pipeline import answer_question
 
 load_dotenv()
@@ -27,6 +27,11 @@ _needs_key = pytest.mark.skipif(
 )
 
 SAMPLE = "tests/data/sample.csv"
+
+
+def _verify_llm():
+    return AnthropicLLM(model=os.getenv("VERIDATA_VERIFY_MODEL") or DEFAULT_VERIFY_MODEL)
+
 
 # (question, expected value that must appear in the result rows)
 CASES = [
@@ -63,8 +68,33 @@ def test_contains_matches_numbers_and_strings():
 @pytest.mark.parametrize("question,expected", CASES)
 def test_eval_seed_answers_are_correct(question, expected, tmp_path):
     con = ingest_csv(SAMPLE, con=duckdb.connect()).con
-    result = answer_question(con, "data", question, AnthropicLLM(), records_dir=tmp_path)
+    result = answer_question(
+        con, "data", question, AnthropicLLM(), verify_llm=_verify_llm(), records_dir=tmp_path
+    )
     assert _contains(result.answer, expected), (
         f"Q={question!r} expected {expected!r} not in {result.answer['rows']!r} "
         f"(sql: {result.sql})"
     )
+
+
+@_needs_key
+def test_verification_lowers_wrong_answer_rate(tmp_path):
+    """Measure the verification layer's effect: wrong answers that are *presented*
+    (not abstained, not low-confidence) should be no more than the baseline wrong
+    count. The printed rates are the tracked artifact; a richer labelled corpus is
+    the real lever (see plan.md) — this delivers the measurement mechanism.
+    """
+    con = ingest_csv(SAMPLE, con=duckdb.connect()).con
+    baseline_wrong = verified_wrong = 0
+    for question, expected in CASES:
+        r = answer_question(
+            con, "data", question, AnthropicLLM(), verify_llm=_verify_llm(), records_dir=tmp_path
+        )
+        if not _contains(r.answer, expected):
+            baseline_wrong += 1
+            if not r.abstained and r.confidence != "low":
+                verified_wrong += 1  # wrong *and* presented confidently
+    n = len(CASES)
+    print(f"\nbaseline wrong-answer rate:  {baseline_wrong}/{n}")
+    print(f"verified wrong-answer rate:  {verified_wrong}/{n}")
+    assert verified_wrong <= baseline_wrong  # verification can only withhold, never add

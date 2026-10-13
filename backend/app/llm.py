@@ -18,6 +18,10 @@ from opentelemetry import trace
 tracer = trace.get_tracer("veridata")
 
 DEFAULT_MODEL = "claude-opus-4-8"
+# Verification (consistency alt-query + judge) defaults to a cheaper model so
+# self-checking does not triple the cost of the primary answer. Override with
+# VERIDATA_VERIFY_MODEL.
+DEFAULT_VERIFY_MODEL = "claude-haiku-4-5-20251001"
 
 
 @dataclass

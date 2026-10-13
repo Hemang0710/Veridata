@@ -8,6 +8,7 @@ tests run without an API key.
 
 from __future__ import annotations
 
+import os
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -15,6 +16,8 @@ from dataclasses import dataclass
 from opentelemetry import trace
 
 tracer = trace.get_tracer("veridata")
+
+DEFAULT_MODEL = "claude-opus-4-8"
 
 
 @dataclass
@@ -73,4 +76,32 @@ class MockLLM(LLM):
             version=self.version,
             input_tokens=self.input_tokens,
             output_tokens=self.output_tokens,
+        )
+
+
+class AnthropicLLM(LLM):
+    """Real provider. Client is created lazily so the app boots without a key."""
+
+    def __init__(self, model: str | None = None, max_tokens: int = 1024) -> None:
+        self.model = model or os.getenv("ANTHROPIC_MODEL") or DEFAULT_MODEL
+        self.max_tokens = max_tokens
+        self._client = None
+
+    def _generate(self, prompt: str) -> LLMResponse:
+        if self._client is None:
+            from anthropic import Anthropic  # reads ANTHROPIC_API_KEY from env
+
+            self._client = Anthropic()
+        resp = self._client.messages.create(
+            model=self.model,
+            max_tokens=self.max_tokens,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = "".join(b.text for b in resp.content if b.type == "text")
+        return LLMResponse(
+            text=text,
+            model=resp.model,
+            version=resp.model,  # resolved model id is the version we can audit
+            input_tokens=resp.usage.input_tokens,
+            output_tokens=resp.usage.output_tokens,
         )

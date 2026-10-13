@@ -7,13 +7,22 @@ only produces a candidate SQL string via the LLM wrapper.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 
 from opentelemetry import trace
 
-from .llm import LLM
+from .llm import LLM, LLMResponse
 from .schema import SchemaSummary
 
 tracer = trace.get_tracer("veridata")
+
+
+@dataclass
+class SqlAgentResult:
+    sql: str
+    prompt: str  # exact prompt sent to the model, for the run record
+    response: LLMResponse
+
 
 _FENCE = re.compile(r"```(?:sql)?\s*(.*?)```", re.DOTALL | re.IGNORECASE)
 
@@ -34,10 +43,10 @@ def _extract_sql(text: str) -> str:
     return (m.group(1) if m else text).strip()
 
 
-def generate_sql(llm: LLM, schema: SchemaSummary, question: str) -> str:
+def generate_sql(llm: LLM, schema: SchemaSummary, question: str) -> SqlAgentResult:
     with tracer.start_as_current_span("sql_agent.generate") as span:
         prompt = _build_prompt(schema, question)
         resp = llm.generate(prompt)
         sql = _extract_sql(resp.text)
         span.set_attribute("veridata.sql", sql)
-        return sql
+        return SqlAgentResult(sql=sql, prompt=prompt, response=resp)

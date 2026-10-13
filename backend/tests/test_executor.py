@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from app.ingest import ingest_csv
 from app.executor import run_query
+from app.ingest import ingest_csv
 
 SAMPLE = Path(__file__).parent / "data" / "sample.csv"
 
@@ -13,8 +13,6 @@ def test_run_query_returns_rows_and_columns():
     assert total.columns == ["n"]
     assert total.rows == [(6,)]
 
-    sales = run_query(
-        con, "SELECT name FROM data WHERE department = 'Sales' ORDER BY name"
-    )
+    sales = run_query(con, "SELECT name FROM data WHERE department = 'Sales' ORDER BY name")
     assert sales.rows == [("Bob",), ("Eve",)]
     assert sales.row_count == 2

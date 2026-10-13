@@ -7,7 +7,9 @@ dependencies = [
     "fastapi",
     "uvicorn[standard]",
     "python-dotenv",
+    "python-multipart",
     "duckdb",
+    "anthropic",
     "sentry-sdk",
     "opentelemetry-sdk",
     "opentelemetry-exporter-otlp-proto-http",
@@ -15,7 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["pytest", "httpx", "ruff", "black"]
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -26,3 +28,14 @@ packages = ["app"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+# pyflakes (real bugs), pycodestyle errors, import sorting. Formatting is black's job;
+# opinionated families (bugbear/simplify) are left out to avoid FastAPI false positives.
+select = ["E", "F", "I"]
+
+[tool.black]
+line-length = 100

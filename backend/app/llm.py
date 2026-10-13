@@ -51,17 +51,24 @@ class LLM(ABC):
 
 
 class MockLLM(LLM):
-    """Returns a scripted response; records the last prompt for test assertions."""
+    """Returns a scripted response; records the last prompt for test assertions.
+
+    Pass `text` for a single reply returned on every call, or `responses` to
+    script a sequence (consumed in order) when one test drives several model
+    calls — e.g. the verifier's consistency alt-SQL then the judge verdict.
+    """
 
     def __init__(
         self,
-        text: str,
+        text: str = "",
         model: str = "mock-model",
         version: str = "mock-1",
         input_tokens: int = 10,
         output_tokens: int = 5,
+        responses: list[str] | None = None,
     ) -> None:
         self.text = text
+        self._responses = list(responses) if responses is not None else None
         self.model = model
         self.version = version
         self.input_tokens = input_tokens
@@ -70,8 +77,14 @@ class MockLLM(LLM):
 
     def _generate(self, prompt: str) -> LLMResponse:
         self.last_prompt = prompt
+        if self._responses is not None:
+            if not self._responses:
+                raise AssertionError("MockLLM(responses=...) exhausted: more calls than scripted")
+            text = self._responses.pop(0)
+        else:
+            text = self.text
         return LLMResponse(
-            text=self.text,
+            text=text,
             model=self.model,
             version=self.version,
             input_tokens=self.input_tokens,

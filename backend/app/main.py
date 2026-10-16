@@ -14,7 +14,7 @@ from opentelemetry import trace  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
 from .ingest import IngestResult, ingest_csv  # noqa: E402
-from .llm import DEFAULT_VERIFY_MODEL, LLM, AnthropicLLM  # noqa: E402
+from .llm import LLM, build_llm  # noqa: E402
 from .pipeline import PipelineRejected, answer_question  # noqa: E402
 from .telemetry import init_telemetry  # noqa: E402
 
@@ -35,7 +35,7 @@ def get_llm() -> LLM:
     """The model behind /ask. A FastAPI dependency so tests can override it."""
     global _llm
     if _llm is None:
-        _llm = AnthropicLLM()
+        _llm = build_llm()
     return _llm
 
 
@@ -43,7 +43,7 @@ def get_verify_llm() -> LLM:
     """Cheaper model for verification (consistency + judge). Overridable in tests."""
     global _verify_llm
     if _verify_llm is None:
-        _verify_llm = AnthropicLLM(model=os.getenv("VERIDATA_VERIFY_MODEL") or DEFAULT_VERIFY_MODEL)
+        _verify_llm = build_llm(verify=True)
     return _verify_llm
 
 

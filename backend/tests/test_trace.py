@@ -1,6 +1,8 @@
 """Spec 001 trace requirement: every /ask emits one span per step and the
 request's trace ID reaches the client (body + X-Trace-Id header)."""
 
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 from opentelemetry import trace
@@ -21,6 +23,8 @@ STEP_SPANS = {
     "pipeline.run",
 }
 
+SAMPLE = Path(__file__).parent / "data" / "sample.csv"
+
 
 @pytest.fixture
 def spans():
@@ -39,7 +43,7 @@ def test_ask_emits_span_per_step_and_returns_trace_id(tmp_path, monkeypatch, spa
     app.dependency_overrides[get_llm] = lambda: MockLLM("SELECT count(*) AS n FROM data")
     try:
         with TestClient(app) as c:
-            with open("tests/data/sample.csv", "rb") as f:
+            with open(SAMPLE, "rb") as f:
                 c.post("/upload", files={"file": ("sample.csv", f, "text/csv")})
             resp = c.post("/ask", json={"question": "how many rows?"})
     finally:

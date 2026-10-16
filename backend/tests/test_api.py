@@ -1,8 +1,12 @@
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
 from app.llm import MockLLM
 from app.main import app, get_llm, get_verify_llm
+
+SAMPLE = Path(__file__).parent / "data" / "sample.csv"
 
 
 @pytest.fixture
@@ -14,7 +18,7 @@ def client(tmp_path, monkeypatch):
 
 
 def _upload(client):
-    with open("tests/data/sample.csv", "rb") as f:
+    with open(SAMPLE, "rb") as f:
         return client.post("/upload", files={"file": ("sample.csv", f, "text/csv")})
 
 

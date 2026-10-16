@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import duckdb
 import pytest
@@ -7,7 +8,7 @@ from app.ingest import ingest_csv
 from app.llm import MockLLM
 from app.pipeline import PipelineRejected, answer_question
 
-SAMPLE = "tests/data/sample.csv"
+SAMPLE = Path(__file__).parent / "data" / "sample.csv"
 
 
 def _con():

@@ -10,6 +10,7 @@ dependencies = [
     "python-multipart",
     "duckdb",
     "anthropic",
+    "httpx",
     "sentry-sdk",
     "opentelemetry-sdk",
     "opentelemetry-exporter-otlp-proto-http",

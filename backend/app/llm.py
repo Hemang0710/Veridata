@@ -122,3 +122,64 @@ class AnthropicLLM(LLM):
             input_tokens=resp.usage.input_tokens,
             output_tokens=resp.usage.output_tokens,
         )
+
+
+class OpenAICompatibleLLM(LLM):
+    """Any OpenAI-compatible chat API — Google Gemini, Groq, OpenRouter, etc.
+
+    Config from env: LLM_BASE_URL, LLM_API_KEY, LLM_MODEL. The compat endpoint is
+    one POST to {base}/chat/completions, so we use httpx (already a dependency)
+    rather than pulling in the openai SDK. Keys are read lazily in _generate so
+    the app boots without them.
+    """
+
+    def __init__(self, model: str | None = None, max_tokens: int = 1024) -> None:
+        self.model = model or os.getenv("LLM_MODEL") or ""
+        self.max_tokens = max_tokens
+
+    def _generate(self, prompt: str) -> LLMResponse:
+        import httpx
+
+        base_url = (os.getenv("LLM_BASE_URL") or "").rstrip("/")
+        api_key = os.getenv("LLM_API_KEY") or ""
+        if not (base_url and api_key and self.model):
+            raise RuntimeError("OpenAICompatibleLLM needs LLM_BASE_URL, LLM_API_KEY, and LLM_MODEL")
+        resp = httpx.post(
+            f"{base_url}/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={
+                "model": self.model,
+                "max_tokens": self.max_tokens,
+                "messages": [{"role": "user", "content": prompt}],
+            },
+            timeout=60,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        text = data["choices"][0]["message"]["content"] or ""
+        usage = data.get("usage") or {}
+        resolved = data.get("model") or self.model
+        return LLMResponse(
+            text=text,
+            model=resolved,
+            version=resolved,
+            input_tokens=usage.get("prompt_tokens", 0),
+            output_tokens=usage.get("completion_tokens", 0),
+        )
+
+
+def build_llm(verify: bool = False) -> LLM:
+    """Select the provider from LLM_PROVIDER ("anthropic" default, or "openai").
+
+    `verify=True` picks the cheaper verification model: VERIDATA_VERIFY_MODEL if
+    set, else the Anthropic haiku default / the primary LLM_MODEL.
+    """
+    provider = (os.getenv("LLM_PROVIDER") or "anthropic").lower()
+    verify_model = os.getenv("VERIDATA_VERIFY_MODEL")
+    if provider == "anthropic":
+        if verify:
+            return AnthropicLLM(model=verify_model or DEFAULT_VERIFY_MODEL)
+        return AnthropicLLM()
+    if provider in ("openai", "openai_compat", "openai-compatible"):
+        return OpenAICompatibleLLM(model=verify_model if verify else None)
+    raise ValueError(f"unknown LLM_PROVIDER: {provider!r} (use 'anthropic' or 'openai')")

@@ -7,7 +7,7 @@ and persists the run record on every path, including guard rejection.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 import duckdb
@@ -19,6 +19,7 @@ from .llm import LLM
 from .run_record import RunRecord, persist
 from .schema import build_schema_summary
 from .sql_agent import generate_sql
+from .verifier import verify
 
 tracer = trace.get_tracer("veridata")
 
@@ -28,6 +29,10 @@ class AskResult:
     trace_id: str
     sql: str
     answer: dict  # {"columns": [...], "rows": [...]}
+    confidence: str  # "high" | "medium" | "low"
+    abstained: bool
+    reason: str
+    checks: list[dict]  # [{"name", "passed", "detail"}, ...]
 
 
 class PipelineRejected(Exception):
@@ -50,8 +55,10 @@ def answer_question(
     table: str,
     question: str,
     llm: LLM,
+    verify_llm: LLM | None = None,
     records_dir: str | Path | None = None,
 ) -> AskResult:
+    verify_llm = verify_llm or llm  # verification reuses the primary LLM unless given a cheaper one
     with tracer.start_as_current_span("pipeline.run") as span:
         trace_id = _trace_id()
         span.set_attribute("veridata.question", question)
@@ -82,11 +89,35 @@ def answer_question(
             persist(record, records_dir)
             raise PipelineRejected(trace_id, agent.sql, str(exc)) from exc
 
-        result = run_query(con, safe_sql)
-        row_counts["result_rows"] = result.row_count
-        answer = {"columns": result.columns, "rows": result.rows}
+        # A valid-but-wrong query can still fail at execution (e.g. unknown column).
+        # Per spec 002 that is not a 500 — it becomes a failed check and an abstain.
+        try:
+            result = run_query(con, safe_sql)
+            exec_error = None
+        except duckdb.Error as exc:
+            result = None
+            exec_error = str(exc)
+
+        v = verify(con, table, question, safe_sql, result, verify_llm, error=exec_error)
+
+        if result is not None:
+            row_counts["result_rows"] = result.row_count
+            answer = {"columns": result.columns, "rows": result.rows}
+        else:
+            answer = {"columns": [], "rows": []}
+
         record.sql = safe_sql
         record.answer = answer
+        record.verification = asdict(v)
+        record.error = exec_error
         persist(record, records_dir)
 
-        return AskResult(trace_id=trace_id, sql=safe_sql, answer=answer)
+        return AskResult(
+            trace_id=trace_id,
+            sql=safe_sql,
+            answer=answer,
+            confidence=v.confidence,
+            abstained=v.abstained,
+            reason=v.reason,
+            checks=[asdict(c) for c in v.checks],
+        )

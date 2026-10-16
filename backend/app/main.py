@@ -14,7 +14,7 @@ from opentelemetry import trace  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
 from .ingest import IngestResult, ingest_csv  # noqa: E402
-from .llm import LLM, AnthropicLLM  # noqa: E402
+from .llm import LLM, build_llm  # noqa: E402
 from .pipeline import PipelineRejected, answer_question  # noqa: E402
 from .telemetry import init_telemetry  # noqa: E402
 
@@ -28,14 +28,23 @@ tracer = trace.get_tracer("veridata")
 _dataset: IngestResult | None = None
 
 _llm: LLM | None = None
+_verify_llm: LLM | None = None
 
 
 def get_llm() -> LLM:
     """The model behind /ask. A FastAPI dependency so tests can override it."""
     global _llm
     if _llm is None:
-        _llm = AnthropicLLM()
+        _llm = build_llm()
     return _llm
+
+
+def get_verify_llm() -> LLM:
+    """Cheaper model for verification (consistency + judge). Overridable in tests."""
+    global _verify_llm
+    if _verify_llm is None:
+        _verify_llm = build_llm(verify=True)
+    return _verify_llm
 
 
 class AskBody(BaseModel):
@@ -85,12 +94,22 @@ async def upload(file: UploadFile = File(...)):
 
 
 @app.post("/ask")
-def ask(body: AskBody, llm: LLM = Depends(get_llm)):
-    """Run the pipe over a question; return the answer, the SQL, and the trace ID."""
+def ask(
+    body: AskBody,
+    llm: LLM = Depends(get_llm),
+    verify_llm: LLM = Depends(get_verify_llm),
+):
+    """Run the pipe over a question; return the answer, SQL, verification, and trace ID.
+
+    A low-confidence / abstained answer is still a 200 with the reason — only the
+    guard rejects (400). The judge is advisory, never a gate.
+    """
     if _dataset is None:
         raise HTTPException(status_code=400, detail="Upload a CSV first.")
     try:
-        result = answer_question(_dataset.con, _dataset.table, body.question, llm)
+        result = answer_question(
+            _dataset.con, _dataset.table, body.question, llm, verify_llm=verify_llm
+        )
     except PipelineRejected as exc:
         raise HTTPException(
             status_code=400,
@@ -100,4 +119,12 @@ def ask(body: AskBody, llm: LLM = Depends(get_llm)):
                 "trace_id": exc.trace_id,
             },
         ) from exc
-    return {"answer": result.answer, "sql": result.sql, "trace_id": result.trace_id}
+    return {
+        "answer": result.answer,
+        "sql": result.sql,
+        "confidence": result.confidence,
+        "abstained": result.abstained,
+        "reason": result.reason,
+        "checks": result.checks,
+        "trace_id": result.trace_id,
+    }

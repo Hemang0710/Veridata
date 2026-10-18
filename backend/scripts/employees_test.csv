@@ -1,0 +1,13 @@
+employee_id,name,department,salary,hire_date,region
+1,Alice Johnson,Engineering,95000,2019-03-15,North
+2,Bob Smith,Engineering,88000,2020-07-01,North
+3,Carol White,Sales,72000,2018-11-20,South
+4,David Brown,Sales,,2021-01-10,South
+5,Eve Davis,Marketing,67000,2020-05-05,West
+6,Frank Miller,Marketing,71000,2019-09-30,West
+7,Grace Lee,Engineering,102000,2017-06-12,East
+8,Heidi Clark,Finance,85000,2022-02-18,North
+9,Ivan Petrov,Finance,91000,2016-08-23,East
+10,Judy Nguyen,Sales,78000,2021-11-11,South
+11,Mallory King,Engineering,99000,2015-04-04,West
+12,Niaj Patel,Marketing,64000,2023-03-01,East

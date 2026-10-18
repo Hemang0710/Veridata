@@ -3,6 +3,9 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+# Verification probe output (manual, not for review in git)
+backend/verify_probe_results.md
+
 # C extensions
 *.so
 

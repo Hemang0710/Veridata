@@ -17,6 +17,7 @@ import duckdb
 from opentelemetry import trace
 
 from .checks import (
+    CONSISTENCY_COULD_NOT_CORROBORATE,
     CONSISTENCY_NOT_COMPARABLE,
     CheckResult,
     check_consistency,
@@ -24,7 +25,7 @@ from .checks import (
     check_sql_executed,
 )
 from .executor import QueryResult, run_query
-from .guard import guard_sql
+from .guard import first_statement, guard_sql
 from .judge import judge_answer
 from .llm import LLM
 from .schema import build_schema_summary
@@ -63,8 +64,14 @@ def _run_alternate(
     """
     try:
         schema = build_schema_summary(con, table)
-        reworded = f"{question}\n(Answer this a different way as a cross-check.)"
-        alt_sql = guard_sql(generate_sql(llm, schema, reworded).sql)
+        reworded = (
+            f"{question}\n(Answer this a different way as a cross-check. Return a "
+            "single SELECT — no UNION, no multiple statements.)"
+        )
+        # Sanitize to one statement, then through the SAME guard the main query
+        # uses, then run independently. The two results are compared in Python by
+        # check_consistency — the queries are never combined into one UNION.
+        alt_sql = guard_sql(first_statement(generate_sql(llm, schema, reworded).sql))
         return run_query(con, alt_sql), None
     except Exception as exc:  # noqa: BLE001 — advisory path, see docstring
         return None, str(exc)
@@ -81,8 +88,11 @@ def _map(checks: list[CheckResult]) -> tuple[str, bool, str]:
     if judge and not judge.passed:
         return "low", True, judge.detail
     consistency = by_name.get("consistency")
-    if consistency is not None and consistency.detail == CONSISTENCY_NOT_COMPARABLE:
-        return "medium", False, MEDIUM_REASON
+    if consistency is not None:
+        if consistency.detail == CONSISTENCY_NOT_COMPARABLE:
+            return "medium", False, MEDIUM_REASON
+        if consistency.detail.startswith(CONSISTENCY_COULD_NOT_CORROBORATE):
+            return "medium", False, consistency.detail
     return "high", False, "all checks passed"
 
 

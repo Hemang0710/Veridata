@@ -1,4 +1,5 @@
 from app.checks import (
+    CONSISTENCY_COULD_NOT_CORROBORATE,
     CONSISTENCY_NOT_COMPARABLE,
     check_consistency,
     check_result_shape,
@@ -43,9 +44,15 @@ def test_consistency_fails_on_mismatch():
     assert "6" in r.detail and "8" in r.detail
 
 
-def test_consistency_fails_on_alt_error_or_missing():
-    assert not check_consistency(_qr([(6,)]), None, "Binder Error").passed
-    assert not check_consistency(_qr([(6,)]), None, None).passed
+def test_consistency_could_not_corroborate_on_alt_error_or_missing():
+    # An alt query that can't be evaluated is NOT a disagreement — it passes as
+    # "could not corroborate" so the verifier maps it to medium, not an abstain.
+    errored = check_consistency(_qr([(6,)]), None, "Binder Error")
+    assert errored.passed
+    assert errored.detail.startswith(CONSISTENCY_COULD_NOT_CORROBORATE)
+    missing = check_consistency(_qr([(6,)]), None, None)
+    assert missing.passed
+    assert missing.detail.startswith(CONSISTENCY_COULD_NOT_CORROBORATE)
 
 
 def test_consistency_not_comparable_for_non_numeric_answer():

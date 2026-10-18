@@ -62,6 +62,18 @@ def _scan(sql: str) -> list[str]:
     return [s.strip() for s in statements if s.strip()]
 
 
+def first_statement(sql: str) -> str:
+    """Return just the first SQL statement, dropping any trailing ones.
+
+    Used to sanitize model output that came back as several statements before it
+    reaches the guard — the scanner respects string literals and comments, so it
+    is the same splitter the guard trusts. Empty scan falls through to the raw
+    sql so `guard_sql` raises its own "empty statement".
+    """
+    statements = _scan(sql)
+    return statements[0] if statements else sql
+
+
 def guard_sql(sql: str) -> str:
     """Return the validated single SELECT statement, or raise GuardRejection."""
     with tracer.start_as_current_span("guard.check") as span:

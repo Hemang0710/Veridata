@@ -17,6 +17,11 @@ from .executor import QueryResult
 # (the answer isn't numeric). The verifier maps this to medium confidence.
 CONSISTENCY_NOT_COMPARABLE = "no numeric headline to cross-check"
 
+# The alternate cross-check query itself could not be evaluated (bad SQL, guard
+# rejection, execution error, or none produced). That is "could not corroborate",
+# NOT a disagreement — the verifier maps it to medium, not an abstain.
+CONSISTENCY_COULD_NOT_CORROBORATE = "could not corroborate"
+
 
 @dataclass
 class CheckResult:
@@ -69,14 +74,22 @@ def check_consistency(
 ) -> CheckResult:
     """Compare the primary result's headline number against an alternate query's.
 
-    A mismatch beyond tolerance is a strong low-confidence signal. No numeric
-    headline (e.g. the answer is a name) is not a failure — it passes as "not
-    comparable" and the verifier downgrades it to medium.
+    A mismatch beyond tolerance is a strong low-confidence signal. Two outcomes
+    are NOT failures and pass through to medium confidence: no numeric headline
+    (e.g. the answer is a name) is "not comparable"; an alt query that couldn't
+    be evaluated at all is "could not corroborate". Only a successful alt query
+    whose number disagrees is a real failure (low / abstain).
     """
     if alt_error:
-        return CheckResult("consistency", False, f"alternate query failed: {alt_error}")
+        return CheckResult(
+            "consistency", True, f"{CONSISTENCY_COULD_NOT_CORROBORATE}: {alt_error}"
+        )
     if alt is None:
-        return CheckResult("consistency", False, "no alternate query produced")
+        return CheckResult(
+            "consistency",
+            True,
+            f"{CONSISTENCY_COULD_NOT_CORROBORATE}: no alternate query produced",
+        )
     a = _headline_number(primary)
     b = _headline_number(alt)
     if a is None or b is None:

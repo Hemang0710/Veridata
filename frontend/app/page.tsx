@@ -1,17 +1,25 @@
-// Placeholder landing page (spec 004 task 1). The real UI — UploadPanel,
-// QuestionBox, AnswerCard, ConfidenceBadge, ShowYourWork — is built in tasks
-// 2–5. This only confirms the scaffold reads the backend URL from env.
+// Verified chat UI (spec 004). Holds the page state — whether a CSV is loaded
+// and the latest answer — and composes the panels. All transport and types come
+// from lib/api.ts; this file renders what the API returns.
+"use client";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+import { useState } from "react";
+
+import AnswerCard from "@/components/AnswerCard";
+import QuestionBox from "@/components/QuestionBox";
+import UploadPanel from "@/components/UploadPanel";
+import type { AskResponse } from "@/lib/api";
 
 export default function Home() {
+  const [ready, setReady] = useState(false);
+  const [answer, setAnswer] = useState<AskResponse | null>(null);
+
   return (
-    <main style={{ maxWidth: 820, margin: "0 auto", display: "grid", gap: 16 }}>
-      <h1>Veridata</h1>
-      <p>Verified chat UI — under construction.</p>
-      <p style={{ color: "#888" }}>
-        Backend API base URL: <code>{API_BASE_URL}</code>
-      </p>
+    <main style={{ maxWidth: 820, margin: "0 auto", display: "grid", gap: 24 }}>
+      <h1 style={{ margin: 0 }}>Veridata</h1>
+      <UploadPanel onLoaded={() => setReady(true)} />
+      <QuestionBox disabled={!ready} onAnswer={setAnswer} />
+      {answer && <AnswerCard res={answer} />}
     </main>
   );
 }

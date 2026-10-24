@@ -10,6 +10,7 @@ import os  # noqa: E402
 import tempfile  # noqa: E402
 
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from opentelemetry import trace  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
@@ -19,6 +20,15 @@ from .pipeline import PipelineRejected, answer_question  # noqa: E402
 from .telemetry import init_telemetry  # noqa: E402
 
 app = FastAPI(title="Veridata")
+
+# Local dev: frontend (localhost:3000) calls this API cross-origin.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000").split(","),
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 init_telemetry(app)
 
 tracer = trace.get_tracer("veridata")

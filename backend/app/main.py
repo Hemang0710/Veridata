@@ -136,5 +136,6 @@ def ask(
         "abstained": result.abstained,
         "reason": result.reason,
         "checks": result.checks,
+        "chart": result.chart,
         "trace_id": result.trace_id,
     }

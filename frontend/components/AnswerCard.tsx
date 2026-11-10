@@ -3,6 +3,7 @@
 // a collapsible "show your work" panel. Thin client: shows what the API returns,
 // never recomputes confidence or checks.
 
+import Chart from "@/components/Chart";
 import type { AskResponse, Check, Confidence } from "@/lib/api";
 
 const BADGE: Record<Confidence | "abstained", { bg: string; fg: string; label: string }> = {
@@ -133,6 +134,7 @@ export default function AnswerCard({ res }: { res: AskResponse }) {
       <ConfidenceBadge confidence={res.confidence} abstained={res.abstained} />
       {res.reason && <p style={{ margin: 0, color: "#333" }}>{res.reason}</p>}
       <AnswerValue columns={res.answer.columns} rows={res.answer.rows} />
+      <Chart spec={res.chart} />
       <ShowYourWork res={res} />
     </div>
   );

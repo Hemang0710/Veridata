@@ -11,7 +11,7 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from app.llm import MockLLM
-from app.main import app, get_llm
+from app.main import app, get_llm, get_verify_llm
 
 # span per step the spec names: schema build, model call, guard, execution (+ persist)
 STEP_SPANS = {
@@ -41,6 +41,9 @@ def spans():
 def test_ask_emits_span_per_step_and_returns_trace_id(tmp_path, monkeypatch, spans):
     monkeypatch.setenv("VERIDATA_RUN_RECORDS_DIR", str(tmp_path))
     app.dependency_overrides[get_llm] = lambda: MockLLM("SELECT count(*) AS n FROM data")
+    app.dependency_overrides[get_verify_llm] = lambda: MockLLM(
+        responses=["SELECT count(*) AS n FROM data", "VERDICT: yes"]
+    )
     try:
         with TestClient(app) as c:
             with open(SAMPLE, "rb") as f:

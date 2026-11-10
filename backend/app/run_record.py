@@ -37,6 +37,7 @@ class RunRecord:
     row_counts: dict[str, int] = field(default_factory=dict)  # per-step row counts
     answer: dict | None = None  # {"columns": [...], "rows": [...]}
     verification: dict | None = None  # asdict of the Verification (checks, confidence, ...)
+    chart: dict | None = None  # ChartSpec as dict, or None when not chartable
     error: str | None = None
 
 

@@ -13,6 +13,7 @@ from pathlib import Path
 import duckdb
 from opentelemetry import trace
 
+from .chart import build_chart_spec
 from .executor import run_query
 from .guard import GuardRejection, guard_sql
 from .llm import LLM
@@ -33,6 +34,7 @@ class AskResult:
     abstained: bool
     reason: str
     checks: list[dict]  # [{"name", "passed", "detail"}, ...]
+    chart: dict | None  # ChartSpec as dict, or None when not chartable
 
 
 class PipelineRejected(Exception):
@@ -106,9 +108,13 @@ def answer_question(
         else:
             answer = {"columns": [], "rows": []}
 
+        spec = build_chart_spec(answer, v.confidence)
+        chart = asdict(spec) if spec else None
+
         record.sql = safe_sql
         record.answer = answer
         record.verification = asdict(v)
+        record.chart = chart
         record.error = exec_error
         persist(record, records_dir)
 
@@ -120,4 +126,5 @@ def answer_question(
             abstained=v.abstained,
             reason=v.reason,
             checks=[asdict(c) for c in v.checks],
+            chart=chart,
         )

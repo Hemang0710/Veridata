@@ -1,0 +1,25 @@
+# Render Blueprint for the Veridata backend.
+# Secrets and the CORS origin are set in the Render dashboard (sync: false),
+# never committed here.
+services:
+  - type: web
+    name: veridata-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install .
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: LLM_PROVIDER
+        sync: false
+      - key: LLM_BASE_URL
+        sync: false
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        sync: false
+      # Must match os.getenv("CORS_ALLOW_ORIGINS") in backend/app/main.py.
+      # Set to the deployed frontend origin, e.g. https://<app>.vercel.app
+      - key: CORS_ALLOW_ORIGINS
+        sync: false

@@ -222,3 +222,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Frontend (Node/Next.js) — this file is the Python packaging template, whose
+# generic dir rules (lib/, build/, dist/) would otherwise swallow frontend
+# source. Re-include the frontend tree; frontend/.gitignore handles its own
+# build artifacts (.next, node_modules).
+!frontend/lib/
+!frontend/build/
+!frontend/dist/

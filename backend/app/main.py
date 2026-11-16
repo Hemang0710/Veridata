@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from opentelemetry import trace  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
+from .auth import get_current_user_id  # noqa: E402
 from .ingest import IngestResult, ingest_csv  # noqa: E402
 from .llm import LLM, build_llm  # noqa: E402
 from .pipeline import PipelineRejected, answer_question  # noqa: E402
@@ -85,7 +86,10 @@ def health():
 
 
 @app.post("/upload")
-async def upload(file: UploadFile = File(...)):
+async def upload(
+    file: UploadFile = File(...),
+    user_id: str = Depends(get_current_user_id),
+):
     """Load a CSV into DuckDB; return the detected columns and row count."""
     global _dataset
     suffix = os.path.splitext(file.filename or "")[1] or ".csv"
@@ -106,6 +110,7 @@ async def upload(file: UploadFile = File(...)):
 @app.post("/ask")
 def ask(
     body: AskBody,
+    user_id: str = Depends(get_current_user_id),
     llm: LLM = Depends(get_llm),
     verify_llm: LLM = Depends(get_verify_llm),
 ):

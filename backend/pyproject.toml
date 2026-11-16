@@ -9,6 +9,7 @@ dependencies = [
     "python-dotenv",
     "python-multipart",
     "duckdb",
+    "pyjwt",
     "anthropic",
     "httpx",
     "sentry-sdk",

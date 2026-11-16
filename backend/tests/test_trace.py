@@ -10,6 +10,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
+from app.auth import get_current_user_id
 from app.llm import MockLLM
 from app.main import app, get_llm, get_verify_llm
 
@@ -44,6 +45,7 @@ def test_ask_emits_span_per_step_and_returns_trace_id(tmp_path, monkeypatch, spa
     app.dependency_overrides[get_verify_llm] = lambda: MockLLM(
         responses=["SELECT count(*) AS n FROM data", "VERDICT: yes"]
     )
+    app.dependency_overrides[get_current_user_id] = lambda: "test-user"
     try:
         with TestClient(app) as c:
             with open(SAMPLE, "rb") as f:

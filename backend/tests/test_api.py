@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from app.auth import get_current_user_id
 from app.llm import MockLLM
 from app.main import app, get_llm, get_verify_llm
 
@@ -12,6 +13,8 @@ SAMPLE = Path(__file__).parent / "data" / "sample.csv"
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("VERIDATA_RUN_RECORDS_DIR", str(tmp_path))
+    # These tests exercise the pipeline, not auth — bypass the token gate.
+    app.dependency_overrides[get_current_user_id] = lambda: "test-user"
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
@@ -98,6 +101,10 @@ def test_ask_without_upload_is_rejected():
     import app.main as main
 
     main._dataset = None
-    with TestClient(app) as c:
-        resp = c.post("/ask", json={"question": "x"})
+    app.dependency_overrides[get_current_user_id] = lambda: "test-user"
+    try:
+        with TestClient(app) as c:
+            resp = c.post("/ask", json={"question": "x"})
+    finally:
+        app.dependency_overrides.clear()
     assert resp.status_code == 400

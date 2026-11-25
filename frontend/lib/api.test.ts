@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { ApiError, ask, messageFromDetail } from "./api.ts";
+import { ApiError, ask, messageFromDetail, setTokenProvider } from "./api.ts";
 
 const originalFetch = global.fetch;
 function stubFetch(fn: typeof fetch): void {
@@ -68,6 +68,60 @@ test("network failure becomes an ApiError with status 0", async () => {
   });
   try {
     await assert.rejects(ask("x"), (err: unknown) => err instanceof ApiError && err.status === 0);
+  } finally {
+    restoreFetch();
+  }
+});
+
+test("attaches the Supabase access token as a Bearer header", async () => {
+  let seen: Headers | undefined;
+  stubFetch(async (_url, init) => {
+    seen = new Headers(init?.headers);
+    return new Response(
+      JSON.stringify({
+        answer: { columns: [], rows: [] },
+        sql: "",
+        confidence: "high",
+        abstained: false,
+        reason: "",
+        checks: [],
+        trace_id: "t",
+      }),
+      { status: 200 },
+    );
+  });
+  setTokenProvider(async () => "jwt-abc");
+  try {
+    await ask("anything");
+    assert.equal(seen?.get("Authorization"), "Bearer jwt-abc");
+    // The JSON content-type the caller set must survive the header merge.
+    assert.equal(seen?.get("Content-Type"), "application/json");
+  } finally {
+    setTokenProvider(async () => null);
+    restoreFetch();
+  }
+});
+
+test("sends no Authorization header when there is no token", async () => {
+  let seen: Headers | undefined;
+  stubFetch(async (_url, init) => {
+    seen = new Headers(init?.headers);
+    return new Response(
+      JSON.stringify({
+        answer: { columns: [], rows: [] },
+        sql: "",
+        confidence: "high",
+        abstained: false,
+        reason: "",
+        checks: [],
+        trace_id: "t",
+      }),
+      { status: 200 },
+    );
+  });
+  try {
+    await ask("anything");
+    assert.equal(seen?.has("Authorization"), false);
   } finally {
     restoreFetch();
   }

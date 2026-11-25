@@ -4,6 +4,23 @@
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
+// --- Auth token (spec 007 task 3) ---
+// The backend verifies a Supabase JWT on /upload and /ask, so every call carries
+// the current session's access token as a Bearer header. The provider is injected
+// (by lib/supabase/client.ts in the browser) rather than imported, so this module
+// stays a pure transport layer with no Supabase dependency — the Node tests can
+// exercise it without a browser client.
+
+type TokenProvider = () => Promise<string | null>;
+
+// Default: no token (unauthenticated). Replaced at runtime via setTokenProvider.
+let tokenProvider: TokenProvider = async () => null;
+
+/** Register how to obtain the current access token. Called once on the client. */
+export function setTokenProvider(provider: TokenProvider): void {
+  tokenProvider = provider;
+}
+
 // --- Response shapes (mirror backend/app/main.py + pipeline.py) ---
 
 export interface Column {
@@ -87,9 +104,15 @@ export function messageFromDetail(
 }
 
 async function request<T>(path: string, init: RequestInit): Promise<T> {
+  // Attach the Supabase access token. new Headers() preserves whatever the caller
+  // set (JSON content-type for /ask) and leaves /upload's multipart boundary alone.
+  const headers = new Headers(init.headers);
+  const token = await tokenProvider();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+
   let res: Response;
   try {
-    res = await fetch(`${BASE_URL}${path}`, init);
+    res = await fetch(`${BASE_URL}${path}`, { ...init, headers });
   } catch (cause) {
     throw new ApiError(`Could not reach the backend at ${BASE_URL}.`, 0, undefined, { cause });
   }
